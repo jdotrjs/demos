@@ -1,0 +1,165 @@
+<html>
+  <head>
+    <script type='text/javascript' src='../vendor/phaser-3.10.1.min.js'></script>
+    <script type='text/javascript' src='../vendor/samme-health-alpha.js'></script>
+    <script type='text/javascript' src='../vendor/nineslice-0.3.5.min.js'></script>
+    <script type='text/javascript'>
+      /**
+       * type HasHealth interface {
+       *    getHealth(): number
+       *    getMaxHealth(): number
+       * }
+       *
+       * type LocationCfg {
+       *    type: 'fixed' | 'relative',
+       *    x: number,
+       *    y: number,
+       *    w: number,
+       *    h: number,
+       *    frameCfg: string | { key: string, frame: string | number },
+       * }
+       *
+       * type HealthBar interface {
+       *    Render(number, Phaser.Geom.Rectangle): void
+       *    UpdateXY(newX, newY): void
+       * }
+       */
+
+      /**
+       * Adds a health bar hooked into the object's health using nineslice to
+       * generate a border. The bar may be assigned a position relative to the
+       * object or fixed within the scene.
+       *
+       * TODO: this is definitely proof of concept level; additional config and
+       * options to manage depth should be added. Possibly link things via
+       * containers. General polish, frameless options, etc.
+       *
+       * @params {HasHealth} obj - an object that satisfies the HasHealth interface
+       * @params {LocationCfg} locCfg - used to configure placement of the
+       *    helath bar; must meet the structure of LocationCfg
+       * @params {HealthBar} _contents - if specified this is called with the
+       *    current percent and the area that should be drawn for a given
+       *    health level. Will not be called with pct < 0. If not specified will
+       *    us a default constructed via mkContents.
+       *
+       * @returns {NineSlice} returns the components used to draw the frame of
+       *    the health bar.
+       */
+      function addHealthBar(obj, locCfg, _contents = null) {
+        const isRelative = locCfg.type === 'relative'
+        const scn = obj.scene
+
+        const frame = scn.add.nineslice(
+          locCfg.x, locCfg.y,
+          locCfg.w, locCfg.h,
+          locCfg.src, locCfg.offsets,
+        )
+
+        let lastPct = -1
+
+        const contents = _contents ? _contents : mkContents(scn, 0xff0000)
+
+        scn.sys.game.events.on('prerender', () => {
+          if (isRelative) {
+            frame.x = obj.x + locCfg.x
+            frame.y = obj.y + locCfg.y
+          }
+          const bounds = frame.getUsableBounds()
+          contents.UpdateXY(bounds.x, bounds.y)
+
+          const _pct = obj.getHealth() / obj.getMaxHealth()
+          const pct = _pct > 0 ? _pct : 0
+
+          const updatedBounds = new Phaser.Geom.Rectangle(
+            0, 0, bounds.width * pct, bounds.height)
+
+          if (lastPct != pct) {
+            contents.Render(pct, updatedBounds)
+            lastPct = pct
+          }
+        })
+
+        return frame
+      }
+
+      // simple default health bar renderer; returns on implementation of
+      // HealthBar
+      const mkContents = (scn, color) => {
+        const bar = scn.add.graphics()
+        return {
+          Render: (pct, bounds) => {
+            bar.clear()
+            bar.fillStyle(color)
+            bar.fillRectShape(bounds)
+          },
+          UpdateXY: (newX, newY) => {
+            bar.x = newX
+            bar.y = newY
+          },
+        }
+      }
+
+      function preload() {
+        this.load.image('sm_healthframe', './sm_healthbar.png')
+      }
+
+      function create() {
+        this.add.text(500, 500, 'Press A to reduce the health of the small circle', {color: '#000000'}).setOrigin(0.5)
+        this.add.text(500, 550, 'Press B to reduce the health of the large circle', {color: '#000000'}).setOrigin(0.5)
+
+        this.b = this.add.graphics()
+        this.b.fillStyle(0x00ff00)
+        this.b.fillCircle(500, 170, 250)
+
+        this.g = this.add.graphics()
+        this.g.fillStyle(0xff0000)
+        this.g.fillCircle(0, 0, 20)
+        this.input.on('pointermove', ptr => {
+          this.g.x = ptr.x
+          this.g.y = ptr.y
+        })
+
+        this.input.keyboard.on('keyup_A', () => {
+          this.g.damage(5)
+        })
+
+        this.input.keyboard.on('keyup_B', () => {
+          this.b.damage(Math.random() * 500)
+        })
+
+        Phaser.Health.AddTo(this.g).setMaxHealth(100).setHealth(100)
+        addHealthBar(this.g, {
+          type: 'relative',
+          x: -20, y: 25,
+          w: 40, h: 15,
+          src: 'sm_healthframe',
+          offsets: 3,
+        })
+
+        Phaser.Health.AddTo(this.b).setMaxHealth(10000).setHealth(10000)
+        addHealthBar(this.b, {
+          type: 'fixed',
+          x: 100, y: 700,
+          w: 800, h: 50,
+          src: 'sm_healthframe',
+          offsets: 3,
+        })
+      }
+
+      const cfg = {
+        type: Phaser.AUTO,
+        backgroundColor: '0x9a9a9a',
+        width: 1000,
+        height: 800,
+        scene: { preload, create },
+        plugins: {
+          global: [ NineSlice.Plugin.DefaultCfg ],
+        },
+      }
+
+      new Phaser.Game(cfg)
+    </script>
+  </head>
+  <body>
+  </body>
+</html>
