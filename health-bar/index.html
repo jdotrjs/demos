@@ -152,6 +152,7 @@
         width: 1000,
         height: 800,
         scene: { preload, create },
+        parent: 'game',
         plugins: {
           global: [ NineSlice.Plugin.DefaultCfg ],
         },
@@ -161,5 +162,10 @@
     </script>
   </head>
   <body>
+    <p>
+      <a href="..">Go back</a> to all demo listings.
+    </p>
+
+    <div id='game'></div>
   </body>
 </html>
